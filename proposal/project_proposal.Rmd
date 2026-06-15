@@ -36,9 +36,9 @@ Code availability: No
 
 ### 3. What are the analyses you wish to reproduce, or the questions you wish to answer?
 - Exploratory analysis using RNA-seq data  
-- A/B compartment analyses  
-- TADs and insulation scores  
-- Chromatin loop calling and enhancer-promoter contacts  
+- A/B compartment analyses - Daven
+- TADs and insulation scores - Sean
+- Chromatin loop calling and enhancer-promoter contacts - Louis
 - ABC score, GSEA (if time allows)  
 - Additional interesting analyses? (if time allows/something interesting comes up)  
 
