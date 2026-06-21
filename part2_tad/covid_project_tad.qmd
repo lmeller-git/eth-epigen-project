@@ -153,7 +153,7 @@ ggplot(tad_metrics, aes(x = "Infection", y = log2FC)) +
   theme_classic(base_size = 14)
 ```
 It can be seen from the plot that SARS-CoV-2 infection significantly reduces the intra-TAD contacts, which aligns with the findings of the paper. 
-## Hi-C Matrices at a Specific TAD Domain 
+## 4. Hi-C Matrices at a Specific TAD Domain 
 As a full Aggregate Domain Analysis (ADA) proved to be computationally demanding, following the original study, we defined a specific TAD domain of interest on chromosome 14 and visualised Hi-C contacts at this region. We proceeded with bin size of 10kb, unlike in the paper, where the authors switched to a resolution of 5kb for this analysis. We calculated a differential contact matrix for this TAD region, which we visualised together with the contact matrices of both Mock and CoV groups.
 ```{r}
 
