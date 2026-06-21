@@ -1,0 +1,202 @@
+---
+title: "covid_project"
+author: "Xiaohan Xie"
+format: html
+editor: visual
+self-contained: true
+execute:
+  warning: false
+---
+
+```{r include=FALSE}
+library(HiCExperiment)
+library(HiContacts)    
+library(GenomicRanges)
+library(InteractionSet)
+library(rtracklayer)
+library(tidyverse)
+library(epiwraps)
+library(patchwork)
+library(GenomicFeatures)
+```
+
+## 1. Load Hi-C Files
+Using the command line tool of cooler, we merged the replicates for Mock and SARS-CoV-2-infected conditions. In accordance with the original study's methods, we processed the data at 10kb resolution. We then applied matrix balancing normalisation to correct for biase in the Hi-C reads. Lastly, we performed matrix coarsening to generate multi-resolution data. 
+
+We limited our analysis to chromosome 14 to reduce the computational complexity. 
+```{bash, eval=FALSE}
+cooler merge merged_mock_HiC.mcool mock_HiC_rep1.mcool::/resolutions/10000 mock_HiC_rep2.mcool::/resolutions/10000
+cooler merge merged_cov_HiC.mcool cov_HiC_rep1.mcool::/resolutions/10000 cov_HiC_rep2.mcool::/resolutions/10000
+cooler balance merged_mock_HiC.mcool
+cooler balance merged_cov_HiC.mcool
+cooler zoomify -r 10000,200000 merged_mock_HiC.mcool -o merged_mock_HiC_multi.mcool
+cooler zoomify -r 10000,200000 merged_cov_HiC.mcool -o merged_cov_HiC_multi.mcool
+```
+
+```{r}
+hic_mock_merged <- HiCExperiment("./GSE179184_RAW/merged_mock_HiC_multi.mcool", focus = "chr14", resolution = 10000)
+hic_cov_merged <- HiCExperiment("./GSE179184_RAW/merged_cov_HiC_multi.mcool", focus = "chr14", resolution = 10000)
+length(hic_mock_merged)
+length(hic_cov_merged)
+summary(interactions(hic_mock_merged)$balanced)
+summary(interactions(hic_cov_merged)$balanced)
+```
+Mock sample has slightly more interaction counts than the CoV-infected group. Both samples show highly skewed distribution, as the majority of interactions tend to have very balanced scores.
+
+## 2. Insulation Scores and Boundary strengths
+According to methods decribed in the original paper, we calculated the insulation scores using a 200kb sliding window. TAD boundaries were then called by finding the local minima in the insulation profile with a threshold of 0.5. 
+
+```{r, warning=FALSE}
+hic_mock <- getDiamondInsulation(hic_mock_merged, window_size = 200000)
+hic_cov <- getDiamondInsulation(hic_cov_merged, window_size = 200000)
+hic_mock <- getBorders(hic_mock, strong_threshold = 0.5)
+hic_cov <- getBorders(hic_cov, strong_threshold = 0.5)
+bounds_mock <- topologicalFeatures(hic_mock, 'borders')
+bounds_cov <- topologicalFeatures(hic_cov, 'borders')
+```
+In order to compare between two conditions, we merged the detected boundaries from both Mock and CoV groups. 
+```{r}
+merged_bounds <- GenomicRanges::reduce(c(bounds_mock, bounds_cov))
+merged_bounds <- merged_bounds[seqnames(merged_bounds) == "chr14"]
+head(merged_bounds)
+ins_track_mock <- metadata(hic_mock)$insulation
+ins_track_cov <- metadata(hic_cov)$insulation
+```
+We then used the epiwraps package to plot the distribution of insulation scores, extending 500kb upstream and downstream. 
+
+```{r, fig.cap="Insulation scores calculated TAD boundaries in both conditions."}
+ins_track_mock$score <- ins_track_mock$insulation
+ins_track_cov$score  <- ins_track_cov$insulation
+tracks <- list(Mock = ins_track_mock, SARS_CoV_2 = ins_track_cov)
+ins <- signal2Matrix(tracks, regions = merged_bounds, extend = 500000, w = 10000)
+plotEnrichedHeatmaps(ins, scale_title ="Insulation Scores", use_raster = FALSE)
+```
+
+We can see that although CoV-infected group shows a slightly higher insulation score at the consensus boundaries, this effect is rather mild, as reported in the original study. 
+
+## 3. TADs and Intra-TAD Interaction
+We then further obtained the TADs, defined as genomic intervals nested between the previously identified consensus boundaries. 
+```{r}
+# gaps between merged boundaries are TADs
+merged_tads <- gaps(merged_bounds)
+merged_tads <- merged_tads[strand(merged_tads) == "*"] 
+merged_tads <- merged_tads[seqnames(merged_tads) == "chr14"]
+# filter out extremely small fragments (as we have resolution of 10000, use threshold 20000)
+merged_tads <- merged_tads[width(merged_tads) >= 20000]
+# get the GInteractions objects
+gi_mock <- interactions(hic_mock)
+gi_cov <- interactions(hic_cov)
+# filter out very short distant interactions (< 15 kb)
+gi_mock_sub <- gi_mock[pairdist(gi_mock) >= 15000]
+gi_cov_sub <- gi_cov[pairdist(gi_cov) >= 15000]
+```
+
+To quantify the intra-TAD interactions, we defined a function to isolate interactions that occur strictly within the same TAD domain. We then calculated the mean intra-TAD contacts for both groups. 
+```{r}
+# func to map interactions inside TADs
+get_intra_tad_means <- function(gi_filtered, tads) {
+  
+  hits1 <- findOverlaps(anchors(gi_filtered, type="first"), tads)
+  hits2 <- findOverlaps(anchors(gi_filtered, type="second"), tads)
+  
+  # keep only interactions where both anchors found in the same TAD
+  common_hits <- inner_join(
+    as.data.frame(hits1), 
+    as.data.frame(hits2), 
+    by = "queryHits", suffix = c("1", "2")
+  ) %>% filter(subjectHits1 == subjectHits2)
+  
+  # aggregate mean contact score per TAD
+
+  df <- data.frame(
+    tad_idx = common_hits$subjectHits1,
+    contact_val = gi_filtered$balanced[common_hits$queryHits] 
+  )
+  
+  df_mean <- df %>% 
+    group_by(tad_idx) %>% 
+    summarize(mean_contact = mean(contact_val, na.rm = TRUE))
+  
+  return(df_mean)
+}
+
+mock_means <- get_intra_tad_means(gi_mock_sub, merged_tads)
+cov_means <- get_intra_tad_means(gi_cov_sub, merged_tads)
+```
+
+```{r}
+
+tad_metrics <- data.frame(tad_id = 1:length(merged_tads)) %>%
+  left_join(mock_means, by = c("tad_id" = "tad_idx")) %>%
+  rename(Mock_Mean = mean_contact) %>%
+  left_join(cov_means, by = c("tad_id" = "tad_idx")) %>%
+  rename(Cov_Mean = mean_contact) %>%
+  mutate(
+    log2FC = log2((Cov_Mean) / (Mock_Mean))   
+  )
+
+# save it as a col
+mcols(merged_tads) <- tad_metrics 
+
+```
+
+```{r, fig.width=3, fig.height=4, fig.cap="log2FCs of intra-TAD Hi-C interactions."}
+
+# Fig.4c: boxplot of intra-TAD interaction changes
+ggplot(tad_metrics, aes(x = "Infection", y = log2FC)) +
+  geom_violin(fill = "#E74C3C", width = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "",
+    y = expression(log[2]~"Fold Change (SARS-CoV-2 / Mock)")
+  ) +
+  theme_classic(base_size = 14)
+```
+It can be seen from the plot that SARS-CoV-2 infection significantly reduces the intra-TAD contacts, which aligns with the findings of the paper. 
+## Hi-C Matrices at a Specific TAD Domain 
+As a full Aggregate Domain Analysis (ADA) proved to be computationally demanding, following the original study, we defined a specific TAD domain of interest on chromosome 14 and visualised Hi-C contacts at this region. We proceeded with bin size of 10kb, unlike in the paper, where the authors switched to a resolution of 5kb for this analysis. We calculated a differential contact matrix for this TAD region, which we visualised together with the contact matrices of both Mock and CoV groups.
+```{r}
+
+# the target genomic coordinates
+target_chr <- "chr14"
+target_start <- 71400000
+target_end   <- 72600000
+target_region <- paste0(target_chr, ":", target_start, "-", target_end)
+target_gr <- GRanges(seqnames = target_chr, ranges = IRanges(target_start, target_end))
+
+hic_mock_reg <- refocus(hic_mock, target_region)
+hic_cov_reg <- refocus(hic_cov,  target_region)
+
+hic_div      <- divide(hic_cov_reg, by = hic_mock_reg, use.scores = "balanced")
+
+```
+
+```{r, fig.width=9, fig.height=4, fig.cap="Hi-C matrices (bin size = 10 kb) at the indicated region (hg19) and log2FC after infection."}
+
+# mock
+p_matrix_mock <- plotMatrix(hic_mock_reg, use.scores = "balanced", scale = "log10", caption = FALSE) +
+  labs(title = "Mock", fill = "log10 Score", y = paste0(target_chr, ": 71,400,000-72,600,000")) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+
+# cov
+p_matrix_cov <- plotMatrix(hic_cov_reg, use.scores = "balanced", scale = "log10", caption = FALSE) +
+  labs(title = "SARS-CoV-2", fill = "log10 Score") +
+  theme(axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank())
+
+# log2 FC
+p_matrix_l2fc <- plotMatrix(
+  hic_div, 
+  use.scores = "balanced.l2fc",  
+  scale = "linear",             
+  cmap = bgrColors(), caption = FALSE, 
+  limits = c(-2, 2)
+) +
+  labs(title = "SARS-CoV-2/mock", fill = "log2 FC") +
+  theme(axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank())
+
+matrix_panels <- p_matrix_mock + p_matrix_cov + p_matrix_l2fc + 
+  plot_layout(ncol = 3)
+
+matrix_panels
+```
+The patterns here indicate that while intra-TAD interactions tend to be reduced by infection of SARS-CoV-2, contacts outside of TADs are largely unaltered or even increased. Looking at the contact matrices of the two groups (Mock and CoV), we can also see that TAD-boundaries are noticeably perturbed by infection, complementing the results of the insulation score analysis. 
