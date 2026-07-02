@@ -1,0 +1,192 @@
+---
+title: "AB_compartment_analyses"
+format: html
+editor: visual
+---
+
+## **1. Load Hi-C Files**
+
+Similar to the TAD analyses, we used the cooler tool (version 0.10.4) to load the Hi-C files to prepare them for downstream analyses. The `cooler merge` commands merge two 80 kb resolution Hi-C contact matrices for the infected (`merged_cov_HiC.mcool`) and mock-treated (`merged_mock_HiC.mcool`) conditions into separate merged `.mcool` files. The `cooler balance` commands then perform matrix balancing on each merged dataset. We restricted our analysis to chromosome 9 at 80kb resolution to reproduce Fig 1c in particular, which also helps in reducing computational complexity.
+
+```{bash}
+cooler merge merged_cov_HiC.mcool GSM5411175_NS74-NS67-HiC7.mcool::/resolutions/80000 GSM5411176_NS74-NS67-HiC8.mcool::/resolutions/80000 
+
+cooler merge merged_mock_HiC.mcool GSM5411173_NS74-NS67-HiC1.mcool::/resolutions/80000 GSM5411174_NS74-NS67-HiC2.mcool::/resolutions/80000 
+
+cooler balance merged_mock_HiC.mcool
+cooler balance merged_cov_HiC.mcool
+```
+
+## **2.** GC track for eigenvector phasing
+
+As described in the paper, A/B nuclear compartments were identified on the basis of decomposed eigenvectors (E1) from Hi-C contact matrices using cooltools. A/B compartmental scores (E1) were corrected by GC densities in each bin.
+
+To do so, we used cooltools (version 0.7.1, the paper used version 0.4.1 but it is unsupported on our system, and the results are reproduced) and downloaded the hg38 reference. The paper used the hg19 reference, but we managed to reproduced the result with a different reference.
+
+We generated the genomic annotation files at 80 kb resolution on chromosome 9. We calculated chromosome sizes for the hg38 reference genome and cleaned the file to retain only standard chromosomes with numeric lengths. The genome is then partitioned into 80 kb bins using `cooltools genome binnify`, and filtered for bins corresponding to chromosome 9. Because different tools use different chromosome naming conventions, we temporarily renamed `chr9` to the NCBI accession (`CM000671.2`) so that GC content can be calculated from the corresponding NCBI reference genome FASTA. After GC content is computed for each genomic bin, we converted the chromosome name back to the standard `chr9` format. We created a chromosome view file defining the genomic coordinates of chromosome 9 to provide a reference region for subsequent analyses (compartment calling or visualization).
+
+```{bash}
+cooltools genome fetch-chromsizes hg38 > hg38.chrom.sizes
+
+# cleaning
+awk 'BEGIN{OFS="\t"} $2 ~ /^[0-9]+$/ {print $1, $2}' hg38.chrom.sizes > hg38.clean.chrom.sizes
+cooltools genome binnify hg38.clean.chrom.sizes 80000 > hg38.80000.bins.bed
+
+# filter for chromosome 9
+awk '$1=="chr9"' hg38.80000.bins.bed > chr9.80000.bins.bed
+
+# standardizing naming conventions
+awk 'BEGIN{OFS="\t"} NR==1{$1="chrom"; print; next} $1=="chr9"{$1="CM000671.2"; print}' chr9.80000.bins.bed > chr9.80000.bins.ncbi.bed
+
+cooltools genome gc chr9.80000.bins.ncbi.bed ncbi_dataset/ncbi_dataset/data/GCA_000001405.15/GCA_000001405.15_GRCh38_genomic.fna > chr9.80000.gc.tsv
+
+# standardizing naming conventions
+awk 'BEGIN{OFS="\t"} NR==1{print; next} {$1="chr9"; print}' \
+  chr9.80000.gc.tsv > chr9.80000.gc.chrnames.tsv
+  
+echo -e "chr9\t0\t138394717\tchr9" > chr9.view.tsv
+```
+
+## **3.** Compartment analysis
+
+Saddle plot analyses were performed to measure the compartmentalization strength on a genome-wide scale using cooltools. We first used `cooltools eigs-cis` to perform eigenvalue decomposition to calculate compartment signal by finding the eigenvector that correlates best with the phasing track, using GC content to orient the compartments and producing compartment tracks such as E1. Next, we used `cooltools expected-cis` to calculate the expected Hi-C signal for cis regions of chromosomal interaction maps, and then `cooltools saddle` using the mock E1 compartment ordering to generate saddle plots for both mock and CoV samples. This allows for comparison of A/B compartment strength and organization under the same reference ordering. Then, we used `cooler dump`, `cooler load`, and `cooler balance` to extract only chr9 bins and contacts from the mock dataset, rebuild them as a standalone `.cool` file, and normalize it.
+
+```{bash}
+
+for SAMPLE in mock cov; do
+  cooltools eigs-cis \
+    merged_${SAMPLE}_HiC.mcool \
+    --view chr9.view.tsv \
+    --phasing-track chr9.80000.gc.chrnames.tsv::GC \
+    --n-eigs 3 \
+    -o ${SAMPLE}_80000
+done
+
+
+for SAMPLE in mock cov; do
+  cooltools expected-cis \
+    --view chr9.view.tsv \
+    merged_${SAMPLE}_HiC.mcool \
+    -p 8 \
+    -o ${SAMPLE}_chr9_80000.expected.tsv
+
+  cooltools saddle \
+    --view chr9.view.tsv \
+    merged_${SAMPLE}_HiC.mcool \
+    mock_80000.cis.vecs.tsv::E1 \
+    ${SAMPLE}_chr9_80000.expected.tsv::balanced.avg \
+    -n 50 \
+    --qrange 0.02 0.98 \
+    --fig png \
+    --strength \
+    -o ${SAMPLE}_chr9_80000.mockOrdered.saddle
+done
+
+cooler dump -t bins merged_mock_HiC.mcool | awk '$1=="chr9"' > chr9.bins.tsv
+cooler dump -t pixels merged_mock_HiC.mcool --join \
+  | awk '$1=="chr9" && $4=="chr9"{print $2"\t"$5"\t"$7}' > chr9.pixels.tsv
+
+cooler load -f coo chr9.bins.tsv chr9.pixels.tsv merged_mock_chr9.cool
+cooler balance merged_mock_chr9.cool
+```
+
+## **4.** Correlation maps from observed/expected Hi-C contact matrices
+
+We generated Pearson correlation maps from observed/expected Hi-C contact matrices for chromosome 9 in the mock and CoV conditions. We computed the expected cis contact frequencies for chr9, extracted the chr9 region from 100–130 Mb (for Fig 1c), and converted the matrix into an observed/expected matrix by normalizing each diagonal by its expected value. We then plotted the resulting correlation matrix.
+
+```{python}
+# pearson_compartments.py
+
+import cooler
+import cooltools
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def corr_pairwise_nan(oe):
+    n = oe.shape[0]
+    corr = np.full((n, n), np.nan)
+
+    for i in range(n):
+        xi = oe[:, i]
+        for j in range(i, n):
+            xj = oe[:, j]
+            valid = np.isfinite(xi) & np.isfinite(xj)
+
+            if valid.sum() >= 3:
+                corr_ij = np.corrcoef(xi[valid], xj[valid])[0, 1]
+                corr[i, j] = corr_ij
+                corr[j, i] = corr_ij
+
+    return corr
+
+def pearson_oe(clr_path, chrom, out_png):
+    clr = cooler.Cooler(clr_path)
+
+    view_df = pd.DataFrame({
+        "chrom": [chrom],
+        "start": [0],
+        "end": [clr.chromsizes[chrom]],
+        "name": [chrom],
+    })
+
+    exp = cooltools.expected_cis(
+        clr,
+        view_df=view_df,
+        nproc=4,
+    )
+
+    res = clr.binsize
+
+    start_bp = 100_000_000
+    end_bp = 130_000_000
+
+    mat = clr.matrix(balance=True).fetch(
+        (chrom, start_bp, end_bp)
+    ).astype(float)
+
+    chrom_exp = exp[exp["region1"] == chrom].set_index("dist")["balanced.avg"]
+
+    n = mat.shape[0]
+
+    oe = np.full(mat.shape, np.nan)
+
+    for d in range(n):
+        val = chrom_exp.get(d, np.nan)
+        if np.isfinite(val) and val > 0:
+            i = np.arange(n - d)
+            oe[i, i + d] = mat[i, i + d] / val
+            oe[i + d, i] = mat[i + d, i] / val
+
+    corr = corr_pairwise_nan(oe)
+
+    plt.figure(figsize=(7, 6))
+    plt.imshow(
+        corr,
+        cmap="RdBu_r",
+        origin="upper",
+        extent=(100, 130, 130, 100),
+    )
+    plt.xlabel("Position (Mb)")
+    plt.ylabel("Position (Mb)")
+    plt.colorbar(label="Pearson r")
+    plt.title(f"{chrom} Pearson O/E")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=300)
+    plt.close()
+
+pearson_oe("merged_mock_HiC.mcool", "chr9", "mock_chr9_pearson.png")
+pearson_oe("merged_cov_HiC.mcool", "chr9", "cov_chr9_pearson.png")
+```
+
+With reference to the figures below, we reproduced Fig 1c. Our results differ from the paper's in one area: we obtained negative correlations in regions where the paper obtained zero correlations. Positive correlations indicate genomic bins with similar interaction profiles and negative correlations suggest different behavior. We propose that this reflects differences in processing that the paper did not mention in detail,
+
+In our code, Pearson correlations are computed directly from the observed/expected matrix, so bins with opposite interaction patterns can produce negative values. The result from the paper may mask negative correlations or used a different normalization. We could also have used different balancing weights, expected-cis calculation, and or differed in whether low-coverage bins were filtered. It would help if the authors could describe their method in greater detail to explain this discrepancy.
+
+Mock:
+
+![](images/clipboard-3762698156.png)
+
+Cov:
+
+![](images/clipboard-3124603547.png)
