@@ -1,17 +1,26 @@
 ---
-title: "AB_compartment_analyses"
-format: html
+title: "A/B Compartment Analyses"
+format:
+  pdf:
+    code-line-numbers: false
+    code-overflow: wrap
+execute:
+  enabled: false
 editor: visual
 ---
 
 ## **1. Load Hi-C Files**
 
-Similar to the TAD analyses, we used the cooler tool (version 0.10.4) to load the Hi-C files to prepare them for downstream analyses. The `cooler merge` commands merge two 80 kb resolution Hi-C contact matrices for the infected (`merged_cov_HiC.mcool`) and mock-treated (`merged_mock_HiC.mcool`) conditions into separate merged `.mcool` files. The `cooler balance` commands then perform matrix balancing on each merged dataset. We restricted our analysis to chromosome 9 at 80kb resolution to reproduce Fig 1c in particular, which also helps in reducing computational complexity.
+Similar to the TAD analyses, we used the cooler tool (version 0.10.4) to load the Hi-C files to prepare them for downstream analyses. The `cooler merge` commands merge two 80 kb resolution Hi-C contact matrices for the infected (`merged_cov_HiC.mcool`) and mock-treated (`merged_mock_HiC.mcool`) conditions into separate merged `.mcool` files. The `cooler balance` commands then perform matrix balancing on each merged dataset. We restricted our analysis to chromosome 9 at 80kb resolution to reproduce Fig 1c in particular, and it also helps in reducing computational complexity.
 
 ```{bash}
-cooler merge merged_cov_HiC.mcool GSM5411175_NS74-NS67-HiC7.mcool::/resolutions/80000 GSM5411176_NS74-NS67-HiC8.mcool::/resolutions/80000 
+cooler merge merged_cov_HiC.mcool \
+  GSM5411175_NS74-NS67-HiC7.mcool::/resolutions/80000 \
+  GSM5411176_NS74-NS67-HiC8.mcool::/resolutions/80000 
 
-cooler merge merged_mock_HiC.mcool GSM5411173_NS74-NS67-HiC1.mcool::/resolutions/80000 GSM5411174_NS74-NS67-HiC2.mcool::/resolutions/80000 
+cooler merge merged_mock_HiC.mcool \
+  GSM5411173_NS74-NS67-HiC1.mcool::/resolutions/80000 \
+  GSM5411174_NS74-NS67-HiC2.mcool::/resolutions/80000 
 
 cooler balance merged_mock_HiC.mcool
 cooler balance merged_cov_HiC.mcool
@@ -29,16 +38,21 @@ We generated the genomic annotation files at 80 kb resolution on chromosome 9. W
 cooltools genome fetch-chromsizes hg38 > hg38.chrom.sizes
 
 # cleaning
-awk 'BEGIN{OFS="\t"} $2 ~ /^[0-9]+$/ {print $1, $2}' hg38.chrom.sizes > hg38.clean.chrom.sizes
+awk 'BEGIN{OFS="\t"} $2 ~ /^[0-9]+$/ {print $1, $2}' \
+  hg38.chrom.sizes > hg38.clean.chrom.sizes
 cooltools genome binnify hg38.clean.chrom.sizes 80000 > hg38.80000.bins.bed
 
 # filter for chromosome 9
 awk '$1=="chr9"' hg38.80000.bins.bed > chr9.80000.bins.bed
 
 # standardizing naming conventions
-awk 'BEGIN{OFS="\t"} NR==1{$1="chrom"; print; next} $1=="chr9"{$1="CM000671.2"; print}' chr9.80000.bins.bed > chr9.80000.bins.ncbi.bed
+awk 'BEGIN{OFS="\t"} NR==1{$1="chrom"; print; next} \
+  $1=="chr9"{$1="CM000671.2"; print}' \
+  chr9.80000.bins.bed > chr9.80000.bins.ncbi.bed
 
-cooltools genome gc chr9.80000.bins.ncbi.bed ncbi_dataset/ncbi_dataset/data/GCA_000001405.15/GCA_000001405.15_GRCh38_genomic.fna > chr9.80000.gc.tsv
+cooltools genome gc chr9.80000.bins.ncbi.bed \
+  ncbi_dataset/ncbi_dataset/data/GCA_000001405.15/GCA_000001405.15_GRCh38_genomic.fna \
+  > chr9.80000.gc.tsv
 
 # standardizing naming conventions
 awk 'BEGIN{OFS="\t"} NR==1{print; next} {$1="chr9"; print}' \
@@ -179,14 +193,14 @@ pearson_oe("merged_mock_HiC.mcool", "chr9", "mock_chr9_pearson.png")
 pearson_oe("merged_cov_HiC.mcool", "chr9", "cov_chr9_pearson.png")
 ```
 
-With reference to the figures below, we reproduced Fig 1c. Our results differ from the paper's in one area: we obtained negative correlations in regions where the paper obtained zero correlations. Positive correlations indicate genomic bins with similar interaction profiles and negative correlations suggest different behavior. We propose that this reflects differences in processing that the paper did not mention in detail,
+With reference to the figures below, we reproduced Fig 1c. Shown below are the Pearson correlation matrices of Hi-C of a region (chr9: 100–130 Mb, hg19), where they show alteration of the 3D genome and chromatin compartmentalization by SARS-COV-2.
 
-In our code, Pearson correlations are computed directly from the observed/expected matrix, so bins with opposite interaction patterns can produce negative values. The result from the paper may mask negative correlations or used a different normalization. We could also have used different balancing weights, expected-cis calculation, and or differed in whether low-coverage bins were filtered. It would help if the authors could describe their method in greater detail to explain this discrepancy.
+Our results differ from the paper's in one area: we obtained negative correlations in regions where the paper obtained zero correlations. We propose that this reflects differences in processing that the paper did not mention in detail. In our code, Pearson correlations are computed directly from the observed/expected matrix, so bins with opposite interaction patterns can produce negative values. The result from the paper may mask negative correlations or used a different normalization. We could also have used different balancing weights, expected-cis calculation, or differed in whether low-coverage bins were filtered. It would help if the authors could describe their method in greater detail to explain this discrepancy.
 
-Mock:
+## **Mock**
 
 ![](images/clipboard-3762698156.png)
 
-Cov:
+## SARS-COV-2
 
 ![](images/clipboard-3124603547.png)
