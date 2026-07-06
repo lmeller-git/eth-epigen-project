@@ -1,0 +1,38 @@
+---
+title: "Reproduction of Paper: SARS-CoV-2 restructures host chromatin architecture"
+author: "Author 1, Author 2, and Author 3"
+date: last-modified
+toc: true
+number-sections: true
+format:
+  pdf:
+    code-line-numbers: false
+    code-overflow: wrap
+    geometry:
+      - top=30mm
+      - left=30mm
+---
+
+## Introduction
+
+In this project, we aim to re-analyze and reproduce parts of the paper: “SARS-CoV-2 restructures host chromatin architecture” by Wang, R., Lee, JH., Kim, J. et al., published in Nature Microbiology in 2023. This paper aims to characterize the 3D genome and epigenome of human cells after SARS-CoV-2 infection, where they find widespread host chromatin restructuring and show that SARS-CoV-2 affects host chromatin. Before this study, it was relatively unknown whether SARS-CoV-2 restructures host chromatin. This study uses a range of bioinformatic approaches and methods to investigate that, some of which are brought up in class. As COVID-19 was a recent large-scale pandemic, we wanted to apply the tools we have learned to study the implications of SARS-CoV-2. In our analyses, we focus on altered TAD contacts, chromatin compartmentalization, and loop extrusion, supporting the authors’ conclusions that SARS-CoV-2 restructures host chromatin.
+
+\pagebreak
+
+## Analyses
+
+```{=latex}
+
+### Part 1: AB Compartment Analyses
+
+\includepdf[pages=-]{AB_compartment_analyses/AB_compartment_analyses.pdf}
+
+### Part 2: TAD Analyses
+
+\includepdf[pages=-]{include part2_tad/covid_project_tad.pdf}
+
+### Part 3: Chromatin Loop Analyses
+
+\includepdf[pages=-]{include loop_calling/loop_analysis4.pdf}
+
+```
