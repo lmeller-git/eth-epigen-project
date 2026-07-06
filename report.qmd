@@ -11,6 +11,9 @@ format:
     geometry:
       - top=30mm
       - left=30mm
+    include-in-header:
+      - text: |
+          \usepackage{pdfpages}
 ---
 
 ## Introduction
@@ -22,17 +25,16 @@ In this project, we aim to re-analyze and reproduce parts of the paper: “SARS-
 ## Analyses
 
 ```{=latex}
-
-### Part 1: AB Compartment Analyses
-
+\addcontentsline{toc}{subsection}{2.1 Part 1: AB Compartment Analyses}
 \includepdf[pages=-]{AB_compartment_analyses/AB_compartment_analyses.pdf}
+```
 
-### Part 2: TAD Analyses
+```{=latex}
+\addcontentsline{toc}{subsection}{2.2 Part 2: TAD Analyses}
+\includepdf[pages=-]{part2_tad/covid_project_tad_pdf.pdf}
+```
 
-\includepdf[pages=-]{include part2_tad/covid_project_tad_pdf.pdf}
-
-### Part 3: Chromatin Loop Analyses
-
-\includepdf[pages=-]{include loop_calling/loop_analysis4.pdf}
-
+```{=latex}
+\addcontentsline{toc}{subsection}{2.3 Part 3: Chromatin Loop Analyses}
+\includepdf[pages=-]{loop_calling/loop_analysis4.pdf}
 ```

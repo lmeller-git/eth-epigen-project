@@ -1,6 +1,16 @@
 project:
   type: default
   execute-dir: project
+  render:
+    - report.qmd
 
-render:
-  - report.qmd
+format:
+  pdf:
+    code-line-numbers: false
+    code-overflow: wrap
+    geometry:
+      - top=30mm
+      - left=30mm
+    include-in-header:
+      - text: |
+          \usepackage{pdfpages}
