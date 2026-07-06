@@ -21,8 +21,18 @@ In this project, we aim to re-analyze and reproduce parts of the paper: “SARS-
 
 ## Analyses
 
-{{< include AB_compartment_analyses/AB_compartment_analyses.qmd >}}
+```{=latex}
 
-{{< include part2_tad/covid_project_tad.qmd >}}
+### Part 1: AB Compartment Analyses
 
-{{< include loop_calling/loop_analysis4.qmd >}}
+\includepdf[pages=-]{AB_compartment_analyses/AB_compartment_analyses.pdf}
+
+### Part 2: TAD Analyses
+
+\includepdf[pages=-]{include part2_tad/covid_project_tad.pdf}
+
+### Part 3: Chromatin Loop Analyses
+
+\includepdf[pages=-]{include loop_calling/loop_analysis4.pdf}
+
+```
