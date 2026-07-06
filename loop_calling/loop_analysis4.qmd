@@ -1,6 +1,12 @@
 ---
 title: "Chromatin Loop Calling and Differential Analysis"
-author: "Louis Meller"
+format:
+  pdf:
+    code-line-numbers: false
+    code-overflow: wrap
+execute:
+  enabled: true
+editor: visual
 ---
 
 ```{r include=FALSE}
@@ -13,6 +19,8 @@ library(DESeq2)
 library(ggplot2)
 library(scales)
 library(reticulate)
+
+use_condaenv("base", required = TRUE)
 ```
 
 ## Overview
@@ -76,7 +84,7 @@ replicate coolers to maximise read depth and sensitivity.
 `cooltools expected-cis` builds the background model of contact frequency as a function
 of genomic distance, required as input to `cooltools dots`.
 
-```{bash, eval=TRUE}
+```{bash, eval=FALSE}
 # chr14 size in hg19 = 107,043,718 bp
 echo -e "chr14\t0\t107043718\tchr14" > ./out/chr14_view.tsv
 
@@ -97,7 +105,7 @@ cooltools expected-cis \
 Dots are called using the parameters specified in **4DN benchmarking protocol** (Oksuz *et al.*, 2021,
 *Nat. Methods*)
 
-```{bash, eval=TRUE}
+```{bash, eval=FALSE}
 cooltools dots \
     --nproc 4 \
     --view ./out/chr14_view.tsv \
@@ -127,7 +135,7 @@ cooltools dots \
 
 ## 2. Build a Consensus Loop Set
 
-Find all loops that occurr in both conditions.
+Here we look for loops that are present in both infected and mock groups.
 
 ```{r}
 read_loops <- function(path, tag) {
@@ -157,11 +165,6 @@ read_loops <- function(path, tag) {
 loops_mock <- read_loops("./out/loops_mock_10kb.bedpe", "mock")
 loops_cov <- read_loops("./out/loops_cov_10kb.bedpe", "cov")
 
-cat(sprintf("Loops called in Mock:        %d\n", nrow(loops_mock)))
-cat(sprintf("Loops called in SARS-CoV-2:  %d\n", nrow(loops_cov)))
-```
-
-```{r}
 margin <- 10000
 
 anchor_gr <- function(df, anchor) {
@@ -183,18 +186,6 @@ shared <- inner_join(as.data.frame(ov1), as.data.frame(ov2),
   by = c("queryHits", "subjectHits")
 )
 
-cat(sprintf("Loops reproducibly called in both conditions: %d\n", nrow(shared)))
-cat(sprintf(
-  "Loops unique to Mock:        %d\n",
-  nrow(loops_mock) - length(unique(shared$queryHits))
-))
-cat(sprintf(
-  "Loops unique to SARS-CoV-2:  %d\n",
-  nrow(loops_cov) - length(unique(shared$subjectHits))
-))
-```
-
-```{r}
 cov_unique <- loops_cov %>%
   filter(!(row_number() %in% unique(shared$subjectHits)))
 
@@ -204,37 +195,10 @@ loops_consensus <- bind_rows(loops_mock, cov_unique) %>%
     loop_size_kb = loop_size / 1e3
   )
 
-cat(sprintf(
-  "Consensus loop set: %d unique loops on chr14\n",
-  nrow(loops_consensus)
-))
-```
-
-```{r}
 loops_consensus %>%
   select(chrom1, start1, end1, chrom2, start2, end2, loop_id) %>%
   write_tsv("./out/loops_consensus_chr14.bedpe", col_names = TRUE)
 ```
-
-```{r}
-ggplot(loops_consensus, aes(x = loop_size_kb)) +
-  geom_histogram(
-    binwidth = 50, fill = "#4D9221", colour = "white",
-    linewidth = 0.2
-  ) +
-  scale_x_continuous(
-    labels = comma_format(suffix = " kb"),
-    limits = c(0, NA)
-  ) +
-  labs(
-    x     = "Loop span (kb)",
-    y     = "Number of loops",
-    title = "Consensus loop set — size distribution"
-  ) +
-  theme_classic(base_size = 13)
-```
-
-Most loops are below 2000kb size.
 
 ---
 
@@ -308,7 +272,6 @@ for _, lp in loops.iterrows():
 
 count_df = pd.DataFrame(rows)
 count_df.to_csv("./out/loop_raw_counts_40kb.tsv", sep="\t", index=False)
-print(f"Saved count matrix: {count_df.shape[0]} loops at 10kb resolution")
 ```
 
 ### 3.3 DESeq2 Differential Loop Testing
@@ -325,13 +288,7 @@ rownames(count_mat) <- counts_raw$loop_id
 
 keep <- rowSums(count_mat) > 0
 count_mat <- count_mat[keep, , drop = FALSE]
-cat(sprintf(
-  "Loops retained after count filtering: %d / %d\n",
-  sum(keep), length(keep)
-))
-```
 
-```{r}
 col_data <- data.frame(
   condition = factor(c("Mock", "Mock", "SARS_CoV_2", "SARS_CoV_2"),
     levels = c("Mock", "SARS_CoV_2")
@@ -355,10 +312,6 @@ res <- results(
   independentFiltering = FALSE
 )
 
-summary(res)
-```
-
-```{r}
 res_df <- as.data.frame(res) %>%
   rownames_to_column("loop_id") %>%
   left_join(
@@ -522,7 +475,7 @@ write_bedpe(
 
 ### 5.2 Run coolpuppy
 
-```{bash, eval=TRUE}
+```{bash, eval=FALSE}
 # consensus loops
 coolpup.py \
     --expected ./out/expected_mock_10kb.tsv \

@@ -1,0 +1,20 @@
+---
+title: "Reproduction of Paper: SARS-CoV-2 restructures host chromatin architecture"
+author: "Author 1, Author 2, and Author 3"
+date: last-modified
+toc: true
+number-sections: true
+format:
+  pdf:
+    code-line-numbers: false
+    code-overflow: wrap
+    geometry:
+      - top=30mm
+      - left=30mm
+---
+
+{{< include AB_compartment_analyses/AB_compartment_analyses.qmd >}}
+
+{{< include part2_tad/covid_project_tad.qmd >}}
+
+{{< include loop_calling/loop_analysis4.qmd >}}
