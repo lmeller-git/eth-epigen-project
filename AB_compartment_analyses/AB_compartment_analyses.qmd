@@ -193,14 +193,14 @@ pearson_oe("merged_mock_HiC.mcool", "chr9", "mock_chr9_pearson.png")
 pearson_oe("merged_cov_HiC.mcool", "chr9", "cov_chr9_pearson.png")
 ```
 
-With reference to the figures below, we reproduced Fig 1c. Shown below are the Pearson correlation matrices of Hi-C of a region (chr9: 100–130 Mb, hg19), where they show alteration of the 3D genome and chromatin compartmentalization by SARS-COV-2.
+With reference to the figures below, we reproduced Fig 1c. Shown below are the Pearson correlation matrices of Hi-C of a region (chr9: 100–130 Mb, hg19), where they show alteration of the 3D genome and chromatin compartmentalization by SARS-COV-2. These matrices are used to visualize chromatin compartmentalization (A and B compartments) by measuring how similarly different genomic regions interact with the rest of the chromosome. From the matrices and the right panel of Fig 1c, we see that there is increased A-B mixing and reduced A-A interactions, indicating that interactions between active (A) and inactive (B) chromatin compartments become more similar after infection and there is a weakening of interactions among transcriptionally active chromatin regions. These observations demonstrate that SARS-CoV-2 disrupts large-scale chromatin organization by weakening compartment structure. Instead of maintaining distinct active and inactive chromatin domains, infected cells exhibit increased mixing between compartments and reduced cohesion within active chromatin
 
 Our results differ from the paper's in one area: we obtained negative correlations in regions where the paper obtained zero correlations. We propose that this reflects differences in processing that the paper did not mention in detail. In our code, Pearson correlations are computed directly from the observed/expected matrix, so bins with opposite interaction patterns can produce negative values. The result from the paper may mask negative correlations or used a different normalization. We could also have used different balancing weights, expected-cis calculation, or differed in whether low-coverage bins were filtered. It would help if the authors could describe their method in greater detail to explain this discrepancy.
 
-## **Mock**
+## Pearson correlation matrix of Hi-C: Mock
 
 ![](images/clipboard-3762698156.png)
 
-## SARS-COV-2
+## Pearson correlation matrix for Hi-C: SARS-COV-2
 
 ![](images/clipboard-3124603547.png)
