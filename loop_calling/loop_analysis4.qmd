@@ -4,6 +4,7 @@ format:
   pdf:
     code-line-numbers: false
     code-overflow: wrap
+    toc: false
 execute:
   enabled: true
 editor: visual
@@ -20,7 +21,7 @@ library(ggplot2)
 library(scales)
 library(reticulate)
 
-use_condaenv("base", required = TRUE)
+use_condaenv("base", required = FALSE)
 ```
 
 ## Overview
