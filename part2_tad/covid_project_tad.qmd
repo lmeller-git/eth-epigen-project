@@ -1,14 +1,22 @@
 ---
-title: "covid_project"
+title: "Part2: TAD-Insulation and Intra-TAD Interactions"
 author: "Xiaohan Xie"
 format: html
 editor: visual
 self-contained: true
 execute:
   warning: false
+  message: false
 ---
+## 0. Overview
 
-```{r include=FALSE}
+This section investigates how SARS-CoV-2 infection perturbs chromatin architecture at the level of topologically associating domains (TADs). Specifically, we reproduce three analyses from the original study:
+
+Specifically, we aim to reproduce the following analyses in the original paper: 
+1. Boundary integrity: whether TAD boundary strength changes upon infection;
+2. Intra-TAD interactions: whether contact frequency within TADs is altered;
+3. Direct comparison of Hi-C contact matrices at a representative TAD domain. 
+```{r}
 library(HiCExperiment)
 library(HiContacts)    
 library(GenomicRanges)
@@ -20,10 +28,12 @@ library(patchwork)
 library(GenomicFeatures)
 ```
 
-## 1. Load Hi-C Files
-Using the command line tool of cooler, we merged the replicates for Mock and SARS-CoV-2-infected conditions. In accordance with the original study's methods, we processed the data at 10kb resolution. We then applied matrix balancing normalisation to correct for biase in the Hi-C reads. Lastly, we performed matrix coarsening to generate multi-resolution data. 
+## 1. Data Preparation
 
-We limited our analysis to chromosome 14 to reduce the computational complexity. 
+Using the command line tool of cooler, we merged the replicates for Mock and SARS-CoV-2-infected conditions. In accordance with the original study's methods, we processed the data at 10kb resolution. Because the paper does not specify a normalisation procedure in detail, we applied cooler's built-in matrix-balancing algorithm to correct for coverage biases and generated balanced contact scores, which were used throughout the downstream analysis. Lastly, we performed matrix coarsening to generate multi-resolution data, as this was needed for the calculation of insulation scores.
+
+We limited our analysis to chromosome 14 to reduce the computational complexity.
+
 ```{bash, eval=FALSE}
 cooler merge merged_mock_HiC.mcool mock_HiC_rep1.mcool::/resolutions/10000 mock_HiC_rep2.mcool::/resolutions/10000
 cooler merge merged_cov_HiC.mcool cov_HiC_rep1.mcool::/resolutions/10000 cov_HiC_rep2.mcool::/resolutions/10000
@@ -41,10 +51,12 @@ length(hic_cov_merged)
 summary(interactions(hic_mock_merged)$balanced)
 summary(interactions(hic_cov_merged)$balanced)
 ```
-Mock sample has slightly more interaction counts than the CoV-infected group. Both samples show highly skewed distribution, as the majority of interactions tend to have very balanced scores.
+
+Mock sample has slightly more interaction counts than the CoV-infected group. Both samples show highly skewed distribution, with the majority of interactions having very low balanced scores, which is expected for Hi-C data. 
 
 ## 2. Insulation Scores and Boundary strengths
-According to methods decribed in the original paper, we calculated the insulation scores using a 200kb sliding window. TAD boundaries were then called by finding the local minima in the insulation profile with a threshold of 0.5. 
+
+According to methods decribed in the original paper, we calculated the insulation scores using getDiamondInsulation, setting a 200kb sliding window. TAD boundaries were then called by finding the local minima in the insulation profile with a threshold of 0.5.
 
 ```{r, warning=FALSE}
 hic_mock <- getDiamondInsulation(hic_mock_merged, window_size = 200000)
@@ -54,7 +66,9 @@ hic_cov <- getBorders(hic_cov, strong_threshold = 0.5)
 bounds_mock <- topologicalFeatures(hic_mock, 'borders')
 bounds_cov <- topologicalFeatures(hic_cov, 'borders')
 ```
-In order to compare between two conditions, we merged the detected boundaries from both Mock and CoV groups. 
+
+To allow a direct, position-matched comparison between conditions, we pooled the boundaries called in the Mock and infected samples into a single consensus set, as done in the original study.
+
 ```{r}
 merged_bounds <- GenomicRanges::reduce(c(bounds_mock, bounds_cov))
 merged_bounds <- merged_bounds[seqnames(merged_bounds) == "chr14"]
@@ -62,7 +76,8 @@ head(merged_bounds)
 ins_track_mock <- metadata(hic_mock)$insulation
 ins_track_cov <- metadata(hic_cov)$insulation
 ```
-We then used the epiwraps package to plot the distribution of insulation scores, extending 500kb upstream and downstream. 
+
+We then used the `epiwraps` package to visualise insulation-score profiles centred on the consensus boundaries, extending 500 kb up- and downstream of each boundary.
 
 ```{r, fig.cap="Insulation scores calculated TAD boundaries in both conditions."}
 ins_track_mock$score <- ins_track_mock$insulation
@@ -72,10 +87,12 @@ ins <- signal2Matrix(tracks, regions = merged_bounds, extend = 500000, w = 10000
 plotEnrichedHeatmaps(ins, scale_title ="Insulation Scores", use_raster = FALSE)
 ```
 
-We can see that although CoV-infected group shows a slightly higher insulation score at the consensus boundaries, this effect is rather mild, as reported in the original study. 
+We can see that although CoV-infected group shows a slightly higher insulation score at the consensus boundaries, this effect is rather mild, consistent with the original study (Fig.4d). This indicates that TAD boundary strength is largely preserved upon infection.
 
 ## 3. TADs and Intra-TAD Interaction
-We then further obtained the TADs, defined as genomic intervals nested between the previously identified consensus boundaries. 
+
+We then further obtained the TADs, defined as genomic intervals nested between the previously identified consensus boundaries.
+
 ```{r}
 # gaps between merged boundaries are TADs
 merged_tads <- gaps(merged_bounds)
@@ -91,7 +108,8 @@ gi_mock_sub <- gi_mock[pairdist(gi_mock) >= 15000]
 gi_cov_sub <- gi_cov[pairdist(gi_cov) >= 15000]
 ```
 
-To quantify the intra-TAD interactions, we defined a function to isolate interactions that occur strictly within the same TAD domain. We then calculated the mean intra-TAD contacts for both groups. 
+To quantify the intra-TAD interactions, we defined a helper function to isolate interactions that occur strictly within the same TAD domain. We then computed the mean balanced contact score per TAD for each condition.
+
 ```{r}
 # func to map interactions inside TADs
 get_intra_tad_means <- function(gi_filtered, tads) {
@@ -124,6 +142,8 @@ mock_means <- get_intra_tad_means(gi_mock_sub, merged_tads)
 cov_means <- get_intra_tad_means(gi_cov_sub, merged_tads)
 ```
 
+To compare conditions, we then computed, for each TAD, the log2 fold-change of the mean contact score (SARS-CoV-2 relative to Mock).
+
 ```{r}
 
 tad_metrics <- data.frame(tad_id = 1:length(merged_tads)) %>%
@@ -140,6 +160,8 @@ mcols(merged_tads) <- tad_metrics
 
 ```
 
+We then visualised the distribution of these log2FCs.
+
 ```{r, fig.width=3, fig.height=4, fig.cap="log2FCs of intra-TAD Hi-C interactions."}
 
 # Fig.4c: boxplot of intra-TAD interaction changes
@@ -152,9 +174,12 @@ ggplot(tad_metrics, aes(x = "Infection", y = log2FC)) +
   ) +
   theme_classic(base_size = 14)
 ```
-It can be seen from the plot that SARS-CoV-2 infection significantly reduces the intra-TAD contacts, which aligns with the findings of the paper. 
+
+It can be seen from the plot that SARS-CoV-2 infection reduces the intra-TAD contacts, which aligns with the findings of the paper. 
+
 ## 4. Hi-C Matrices at a Specific TAD Domain 
-As a full Aggregate Domain Analysis (ADA) proved to be computationally demanding, following the original study, we defined a specific TAD domain of interest on chromosome 14 and visualised Hi-C contacts at this region. We proceeded with bin size of 10kb, unlike in the paper, where the authors switched to a resolution of 5kb for this analysis. We calculated a differential contact matrix for this TAD region, which we visualised together with the contact matrices of both Mock and CoV groups.
+Following the original study (Fig.4a), we defined a specific TAD domain of interest on chromosome 14 and visualised Hi-C contacts at this region. We proceeded with bin size of 10kb, unlike in the paper, where the authors switched to a resolution of 5kb for this analysis. We calculated a differential contact matrix for this TAD region, which we visualised together with the contact matrices of both Mock and CoV groups.
+
 ```{r}
 
 # the target genomic coordinates
@@ -199,4 +224,12 @@ matrix_panels <- p_matrix_mock + p_matrix_cov + p_matrix_l2fc +
 
 matrix_panels
 ```
-The patterns here indicate that while intra-TAD interactions tend to be reduced by infection of SARS-CoV-2, contacts outside of TADs are largely unaltered or even increased. Looking at the contact matrices of the two groups (Mock and CoV), we can also see that TAD-boundaries are noticeably perturbed by infection, complementing the results of the insulation score analysis. 
+
+The patterns here indicate that while intra-TAD interactions tend to be reduced by infection of SARS-CoV-2, contacts outside of TADs (off-diagonal) are largely unaltered or even increased. This was demonstrated more comprehensively by the Aggregate Domain Analysis in the original paper (Fig.4b). Looking at the contact matrices of the two groups (Mock and CoV), we can also see that TAD-boundaries are not noticeably perturbed by infection, corroborating the results of the insulation score analysis.
+
+## 5. Discussion
+This part of the analysis shows that SARS-CoV-2 infection selectively weakens intra-TAD interactions, while leaving TAD boundaries and inter-TAD contacts largely intact.
+
+It should be noted that our pipeline does not exactly replicate the original methods, since the paper did not fully specify several parameter choices. We were also unable to reproduce the Aggregate Domain Analysis due to a persistent function error that we could not resolve.
+
+Despite these methodological differences, the trends we recovered from this part align well with the conclusions of the original paper.

@@ -6,9 +6,9 @@ OUTDIR="$PWD"
 
 render() {
   local file="$1"
-  local outfile="$OUTDIR/$(basename "${file%.*}.html")"
+  local outfile="$OUTDIR/$(basename "${file%.*}.pdf")"
   echo "rendering $file to $outfile..."
-  Rscript -e "rmarkdown::render('$file', output_file='$outfile')"
+  Rscript -e "rmarkdown::render('$file', output_file='$outfile', output_format='pdf_document')"
   echo "Done"
 }
 
