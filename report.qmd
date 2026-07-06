@@ -29,7 +29,7 @@ In this project, we aim to re-analyze and reproduce parts of the paper: “SARS-
 
 ### Part 2: TAD Analyses
 
-\includepdf[pages=-]{include part2_tad/covid_project_tad.pdf}
+\includepdf[pages=-]{include part2_tad/covid_project_tad_pdf.pdf}
 
 ### Part 3: Chromatin Loop Analyses
 
