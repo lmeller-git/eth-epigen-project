@@ -1,6 +1,6 @@
 ---
 title: "Reproduction of Paper: SARS-CoV-2 restructures host chromatin architecture"
-author: "Author 1, Author 2, and Author 3"
+author: "Xiaohan Xie, Daven Lim, Louis Meller"
 date: last-modified
 toc: true
 number-sections: true
@@ -18,11 +18,9 @@ format:
 
 ## Introduction
 
-In this project, we aim to re-analyze and reproduce parts of the paper: “SARS-CoV-2 restructures host chromatin architecture” by Wang, R., Lee, JH., Kim, J. et al., published in Nature Microbiology in 2023. This paper aims to characterize the 3D genome and epigenome of human cells after SARS-CoV-2 infection, where they find widespread host chromatin restructuring and show that SARS-CoV-2 affects host chromatin. Before this study, it was relatively unknown whether SARS-CoV-2 restructures host chromatin. This study uses a range of bioinformatic approaches and methods to investigate that, some of which are brought up in class. As COVID-19 was a recent large-scale pandemic, we wanted to apply the tools we have learned to study the implications of SARS-CoV-2. In our analyses, we focus on altered TAD contacts, chromatin compartmentalization, and loop extrusion, supporting the authors’ conclusions that SARS-CoV-2 restructures host chromatin.
-
-\pagebreak
-
-## Analyses
+In this project, we aim to re-analyze and reproduce parts of the paper “SARS-CoV-2 restructures host chromatin architecture” by Wang, R., Lee, J. H., Kim, J. et al., published in Nature Microbiology in 2023.
+SARS-CoV-2, the virus responsible for COVID-19, caused a global pandemic and has been widely studied for its effects. However, it is relatively unknown whether SARS-CoV-2 could alter the 3D organization of the host genome. Chromatin architecture plays a critical role in regulating gene expression by controlling how different regions of the genome interact, and changes to chromatin organization can have widespread effects on cellular function and host response to infection. The original study aims to characterize the 3D genome and epigenome of human cells after SARS-CoV-2 infection, where they find widespread host chromatin restructuring and show that SARS-CoV-2 disrupts chromatin organization.
+As COVID-19 remains one of the most significant public health events in recent history, we chose this study to apply the methods introduced in class to a biologically relevant problem. In our analyses, we focus on three key aspects of chromatin organization: altered topologically associating domain (TAD) contacts, changes in chromatin compartmentalization (A/B compartments), and loop extrusion. By reproducing these analyses, we evaluate whether our results support the authors' conclusion that SARS-CoV-2 infection causes large-scale restructuring of host chromatin architecture.
 
 ```{=latex}
 \addcontentsline{toc}{subsection}{2.1 Part 1: AB Compartment Analyses}
