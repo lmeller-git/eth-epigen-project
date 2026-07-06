@@ -22,9 +22,7 @@ analysis** from Wang, R., Lee, J.-H., Kim, J. *et al.* "SARS-CoV-2 restructures 
 chromatin architecture." *Nature Microbiology* **8**, 679–694 (2023).
 <https://doi.org/10.1038/s41564-023-01344-8>
 
-Structural chromatin loops are formed primarily by cohesin-driven loop extrusion and
-anchored at convergent CTCF sites. The paper shows that SARS-CoV-2 infection
-preferentially depletes cohesin from intra-TAD regions, weakening these loops and
+The paper shows that SARS-CoV-2 infection preferentially depletes cohesin from intra-TAD regions, weakening chromatin loops and
 reducing enhancer–promoter contacts at interferon response gene loci. We quantify and
 test these changes using a re-implementation of the HICCUPS loop-calling algorithm
 available in **cooltools**, followed by DESeq2 differential testing and Aggregate Peak
@@ -32,18 +30,16 @@ Analysis (APA).
 
 ### Deviations from the paper
 
-| Aspect | Paper | This analysis |
-|---|---|---|
-| Chromosomes | Genome-wide | chr14 only |
-| Resolutions | 5 kb + 10 kb | **10 kb only** — processed mcool files do not contain 5 kb bins |
-| Loop merging | Full 4DN 5 kb + 10 kb strategy | Simplified to 10 kb union (single resolution) |
+The analysis shown in the paper looked at genome wide chromatin loops at 5kb and 10kb resolution.
+We focused our analysis on chromosome 14 and were limited to analysing loops at 10kb resolution.
+
 
 ---
 
 ## 0. Data Preparation
-Using the command line tool of cooler, we merged the replicates for Mock and SARS-CoV-2-infected conditions. In accordance with the original study's methods, we processed the data at 10kb resolution. We then applied matrix balancing normalisation to correct for biase in the Hi-C reads. Lastly, we performed matrix coarsening to generate multi-resolution data.
 
-We limited our analysis to chromosome 14 to reduce the computational complexity.
+The same files and preprocessing steps as in the `tad analysis` were used here.
+
 ```{bash, eval=FALSE}
 mkdir -p ./out
 
